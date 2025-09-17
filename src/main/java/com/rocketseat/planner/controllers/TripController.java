@@ -9,6 +9,8 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -33,9 +35,44 @@ public class TripController {
     }
 
     @GetMapping("/{id}")
-    public ResponseEntity<Trip> getTripDetails(@PathVariable UUID id){
+    public ResponseEntity<Trip> getTripDetails(@PathVariable UUID id) {
         Optional<Trip> trip = this.tripRepository.findById(id);
 
-        return  trip.map(ResponseEntity::ok).orElseGet(()-> ResponseEntity.notFound().build());
+        return trip.map(ResponseEntity::ok).orElseGet(() -> ResponseEntity.notFound().build());
+    }
+
+    @PutMapping("/{id}")
+    public ResponseEntity<Trip> updateTrip(@PathVariable UUID id,
+            @RequestBody TripRequestPayload payload) {
+        Optional<Trip> trip = this.tripRepository.findById(id);
+
+        if (trip.isPresent()) {
+            Trip rawTrip = trip.get();
+            rawTrip.setDestination(payload.destination());
+            rawTrip.setEndsAt(LocalDateTime.parse(payload.ends_at(), DateTimeFormatter.ISO_DATE_TIME));
+            rawTrip.setStartsAt(LocalDateTime.parse(payload.starts_at(), DateTimeFormatter.ISO_DATE_TIME));
+
+            this.tripRepository.save(rawTrip);
+            return ResponseEntity.ok(rawTrip);
+        }
+
+        return trip.map(ResponseEntity::ok).orElseGet(() -> ResponseEntity.notFound().build());
+    }
+
+    @GetMapping("/{id}/confirm")
+    public ResponseEntity<Trip> updateTrip(@PathVariable UUID id) {
+        Optional<Trip> trip = this.tripRepository.findById(id);
+
+        if (trip.isPresent()) {
+            Trip rawTrip = trip.get();
+            rawTrip.setIsConfirmed(true);
+
+            this.tripRepository.save(rawTrip);
+            this.participantService.triggerConfirmationEmailToParticipants(id);
+
+            return ResponseEntity.ok(rawTrip);
+        }
+
+        return trip.map(ResponseEntity::ok).orElseGet(() -> ResponseEntity.notFound().build());
     }
 }
